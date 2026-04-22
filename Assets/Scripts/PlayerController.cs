@@ -1,73 +1,55 @@
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Timers;
 using UnityEngine;
+using UnityEngine.Experimental.GlobalIllumination;
 using UnityEngine.InputSystem;
 
 public class PlayerController : MonoBehaviour
 {
     private Rigidbody2D rb;
+    [Header("Move")]
     public float moveSpeed = 20;
     private Vector2 moveDir;
 
-    [SerializeField] private float maxVelocity;
-    private Vector2 velocity;
-    public float jumpSpeed = 2;
-    private bool isJumping;
-    private bool isGrounded = true;
-    private float jumpTime;
-    public float maxJumpTime = 0.8f;
+    [Header("Jump")]
+    public float jumpPower = 10;
+    public int maxJumps = 2;
+    int jumpsRemaining;
+
+    [Header("Ground Check")]
+    public Transform groundCheckPos;
+    public Vector2 groundCheckSize = new Vector2(0.5f, 0.5f);
+    public LayerMask groundLayer;
+
+    [Header("Gravity")]
+    public float baseGravity = 1;
+    public float maxFallSpeed = 18;
+    public float fallSpeedMulitiplier = 2;
+
     public void StartController()
     {
         rb = GetComponent<Rigidbody2D>();
+        jumpsRemaining = maxJumps;
     }
 
     public void UpdateController()
     {
         rb.linearVelocity = new Vector2(moveDir.x * moveSpeed, rb.linearVelocity.y);
-
-        /*
-        moveDir = InputSystem.actions["Move"].ReadValue<Vector2>();
-        Debug.Log("HE");
-        //Vector2 newPos = new Vector2((transform.position.x + velocity.x), transform.position.y);
-        // Jumping
-        if (InputSystem.actions["Jump"].triggered && GroundCheck())
-        {
-            isJumping = true;
-            jumpTime = maxJumpTime;
-        }
-        */
+        GroundCheck();
+        Gravity();
     }
 
-    public void FixedUpdateController()
+    private void Gravity()
     {
-        /*
-        // AD movement
-        //velocity.x = moveDir.x != 0 ? maxVelocity : 0; //moveDir.x * speed * Time.deltaTime;
-
-        if (moveDir.x > 0) velocity.x = maxVelocity;
-        else if (moveDir.x < -0) velocity.x = -maxVelocity;
-        else velocity.x = 0;
-
-        Vector3 jumpVec = Vector3.zero;
-        if (isJumping)
+        if(rb.linearVelocity.y < 0)
         {
-            jumpVec.y += jumpSpeed * Time.deltaTime; //(2 * jumpSpeed / maxJumpTime) * Time.deltaTime;
-            jumpTime -= Time.deltaTime;
-            if (jumpTime < 0)
-            {
-                isJumping = false;
-            }
+            rb.gravityScale = baseGravity * fallSpeedMulitiplier; // Fall increasingly faster
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, Mathf.Max(rb.linearVelocity.y, -maxFallSpeed)); // Cap Player at Max Fallspeed
         }
-        //newPos.y += velocity.y;
-        //transform.position = newPos;
-        Debug.Log(velocity.x + " " + velocity.y + " " + jumpTime);
-        //rb.AddForce(velocity);
-        //velocity.y -= 9.8f * Time.deltaTime;
-        //rb.linearVelocity += velocity;
-        //rb.AddForce(jumpVec);
-        Vector2 xVelocity = new Vector2(velocity.x, 0);
-        rb.linearVelocity = xVelocity;
-        */
+        else
+        {
+            rb.gravityScale = baseGravity;
+        }
     }
 
     public void Move(InputAction.CallbackContext context)
@@ -75,6 +57,38 @@ public class PlayerController : MonoBehaviour
         moveDir.x = context.ReadValue<Vector2>().x;
     }
 
+    public void Jump(InputAction.CallbackContext context)
+    {
+        Debug.Log("Jumps remaining " + jumpsRemaining );
+        if (jumpsRemaining > 0)
+        {
+            if (context.performed)
+            {
+                // Hold jump for full height
+                Debug.Log("Jump");
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpPower);
+                jumpsRemaining--;
+            }
+            else if (context.canceled)
+            {
+                // Release jump early for half height
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y * 0.5f);
+                jumpsRemaining--;
+            }
+        }
+    }
+
+    private void GroundCheck()
+    {
+        float angle = Quaternion.Angle(groundCheckPos.rotation, Quaternion.identity);
+
+        if (Physics2D.OverlapBox(groundCheckPos.position, groundCheckSize, 0, groundLayer))
+        {
+            jumpsRemaining = maxJumps;
+        }
+    }
+
+    /*
     private bool GroundCheck()
     {
         float dist = 0.5f;
@@ -90,5 +104,12 @@ public class PlayerController : MonoBehaviour
         Debug.DrawRay(frontPos, Vector2.down, Color.red, dist);
         Debug.DrawRay(backPos, Vector2.down, Color.red, dist);
         return isGrounded;
+    }
+    */
+
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.white;
+        Gizmos.DrawWireCube(groundCheckPos.position, groundCheckSize);
     }
 }

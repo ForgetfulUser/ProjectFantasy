@@ -14,9 +14,4 @@ public class GameManager : MonoBehaviour
     {
         PlayerManager.UpdateManager();
     }
-
-    private void FixedUpdate()
-    {
-        PlayerManager.FixedUpdateManager();
-    }
 }
